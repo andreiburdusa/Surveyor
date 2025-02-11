@@ -6,12 +6,11 @@ import Control.Monad (replicateM)
 import qualified Data.ByteString as BS
 import Data.List (intersperse)
 import Data.Word
-import System.IO.Unsafe (unsafePerformIO)
 import Text.Megaparsec
 import Text.Megaparsec.Byte
 import Text.Megaparsec.Byte.Binary (word32le, word64le)
 
-type Parser a = ParsecT String BS.ByteString IO a
+type Parser a = Parsec String BS.ByteString a
 
 data R1CSFileSection =
                        SHeader Word32 Integer Word32 Word32 Word32 Word32 Word64 Word32
@@ -101,7 +100,7 @@ r1csFileParser = do
 
 parseConstraintSection :: R1CSConfig -> BS.ByteString -> Either (ParseErrorBundle BS.ByteString String) Constraints
 parseConstraintSection config bs =
-    unsafePerformIO . flip (flip runParserT "") bs $ do
+    flip (flip runParser "") bs $ do
       constrs <- replicateM (fromEnum . mConstraints $ config) $ do
         nA <- word32le
         as <- replicateM (fromEnum nA) $ do
@@ -123,14 +122,14 @@ parseConstraintSection config bs =
 
 parseWire2LabelIdSection :: R1CSConfig -> BS.ByteString -> Either (ParseErrorBundle BS.ByteString String) Wire2LabelId
 parseWire2LabelIdSection config bs =
-    unsafePerformIO . flip (flip runParserT "") bs $ replicateM (fromEnum $ nWires config) word64le >>= pure . Wire2LabelId
+    flip (flip runParser "") bs $ replicateM (fromEnum $ nWires config) word64le >>= pure . Wire2LabelId
 
 parseErr :: String -> Either (ParseErrorBundle BS.ByteString String) a
 parseErr s = runParser (fail s) "" ""
 
 parseR1CSIR :: BS.ByteString -> Either (ParseErrorBundle BS.ByteString String) (R1CSConfig, Constraints, Wire2LabelId)
 parseR1CSIR file = do
-  r1csFile <- unsafePerformIO . runParserT r1csFileParser "" $ file
+  r1csFile <- runParser r1csFileParser "" $ file
   case filter isHeader (sections r1csFile) of
     [(SHeader fieldElemSize prime nWires nPubOut nPubIn nPrvIn nLabels mConstraints)] -> do
         let config = R1CSConfig fieldElemSize prime nWires nPubOut nPubIn nPrvIn nLabels mConstraints
