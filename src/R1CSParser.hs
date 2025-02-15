@@ -147,8 +147,18 @@ toConstraints (as, bs, cs) =
        where toSum [] = "0"
              toSum se = (concat . intersperse " + " . map (\(wID, coeff) -> (show coeff) ++ " * (w " ++ show wID ++ ")") $ se)
 
-toLean :: String ->R1CSConfig -> Constraints -> String
+getNegCoeffs :: Integer -> [([(Word32, Integer)], [(Word32, Integer)], [(Word32, Integer)])] -> [Integer]
+getNegCoeffs p = filter (>(p `div` 2)) . concatMap (\(as, bs, cs) -> (map snd as) ++ (map snd bs) ++ (map snd cs))
+
+genNegLem :: Integer -> Integer -> Integer -> String
+genNegLem p n lem_id = "    have neg_lem_" ++ show lem_id ++ " : (" ++ show n ++ " : ZMod p) = " ++ show (n - p) ++ " := by decide\n"
+
+toLean :: String -> R1CSConfig -> Constraints -> String
 toLean name config (Constraints constr) =
+    let
+        negCoeffs = getNegCoeffs (prime config) constr;
+        defSimpTacs = ["one_mul", "zero_add", "neg_mul", "Mathlib.Tactic.RingNF.add_neg"]
+    in
     "import Mathlib.Data.Nat.Prime.Defs\n" ++
     "import Mathlib.Data.ZMod.Basic\n\n" ++
     "namespace " ++ name ++ "\n\n" ++
@@ -162,7 +172,8 @@ toLean name config (Constraints constr) =
     "example : ∀ w : Witness, w 0 = 1 → circuit w → spec w := by\n" ++
     "    unfold circuit spec\n" ++
     "    intros w w0_is_1\n" ++
-    "    simp only [w0_is_1, one_mul, zero_add]\n" ++
+    (concat $ zipWith (genNegLem (prime config)) negCoeffs [0..]) ++
+    "    simp only [w0_is_1, " ++ (concat . intersperse ", " . (defSimpTacs ++). map (\lem_id -> "neg_lem_" ++ show lem_id) $ [0..((length negCoeffs) - 1)]) ++ "]\n" ++
     "    intros h\n" ++
     "    sorry\n\n" ++
     "end " ++ name

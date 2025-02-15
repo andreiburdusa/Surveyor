@@ -15,18 +15,17 @@ def circuit (w : Witness) : Prop :=
     (1 * (w 2)) * (1 * (w 3)) = 1 * (w 0) + 21888242871839275222246405745257275088548364400416034343698204186575808495616 * (w 1) ∧
     (1 * (w 2)) * (1 * (w 1)) = 0
 
+
 example : ∀ w : Witness, w 0 = 1 → circuit w → spec w := by
     unfold circuit spec
     intros w w0_is_1
-    have : (21888242871839275222246405745257275088548364400416034343698204186575808495616 : ZMod p) = -1 := by decide
-    rw [this]
-    simp only [w0_is_1, one_mul, zero_add, neg_mul]
+    have neg_lem_0 : (21888242871839275222246405745257275088548364400416034343698204186575808495616 : ZMod p) = -1 := by decide
+    simp only [w0_is_1, one_mul, zero_add, neg_mul, Mathlib.Tactic.RingNF.add_neg, neg_lem_0]
     intros h
     by_cases w2_is_0 : w 2 = 0
-    · simp only [w2_is_0, zero_mul, and_true] at h
-      have h := add_eq_of_eq_add_neg h
-      rw [zero_add] at h
-      left; exact ⟨w2_is_0, h⟩
+    · rw [w2_is_0, zero_mul, eq_sub_iff_add_eq, zero_add] at h
+      aesop
     · aesop
+
 
 end IsZero
